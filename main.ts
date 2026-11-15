@@ -38,6 +38,15 @@ const MAX_SLIPPAGE_BPS = 10_000;
 const closes: bigint[] = [];
 /** The close on the bar the current position's buy was decided on, or null. */
 let entryClose: bigint | null = null;
+/**
+ * After a stop-loss exit, do not re-enter on the same dip: in a steady bleed
+ * the price stays 3% below the rolling high and would stop out again on the
+ * next bar. The cooldown (30 bars) forces the bot to wait for a fresh dip.
+ * Take-profit exits do not cool down. On the dev window no stop ever fires,
+ * so this changes nothing there; it only cuts repeated stop-outs live.
+ */
+const COOLDOWN_BARS = 30;
+let blockedUntilSeq = -1;
 
 await runBars({
   onBatch(state: BarsState): OrderInput[] {
@@ -56,6 +65,7 @@ await runBars({
         }
         if (close * 100n < entryClose * (100n - STOP_PCT)) {
           entryClose = null;
+          blockedUntilSeq = state.seq + COOLDOWN_BARS;
           return [{ side: 'sell', symbol: SYMBOL, qty: held.qty, max_slippage_bps: MAX_SLIPPAGE_BPS }];
         }
       }
@@ -63,6 +73,7 @@ await runBars({
     }
 
     // Flat: buy the dip, all in (capped by the weight room).
+    if (state.seq < blockedUntilSeq) return [];
     const start = closes.length > LOOKBACK_BARS ? closes.length - LOOKBACK_BARS : 0;
     let high = closes[start]!;
     for (let i = start + 1; i < closes.length; i++) if (closes[i]! > high) high = closes[i]!;

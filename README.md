@@ -8,7 +8,8 @@ paper USDC; simulation only, no real money.
 - **Enter** (all in) when the latest close is 3% below the highest close of
   the last 240 minutes.
 - **Exit** when the close is 1% above the entry close (take profit) or 2%
-  below it (stop loss).
+  below it (stop loss). After a stop loss, the bot waits 30 bars before
+  re-entering, so a steady bleed cannot stop it out again on the same dip.
 
 ## Why
 
